@@ -115,10 +115,18 @@ main() {
         [ -z "$line" ] && continue
         case "$line" in \#*) continue ;; esac
 
+        case "$line" in
+            *:*) ;;
+            *)
+                echo "⚠️  Skipping malformed line (expected 'database:user'): $line"
+                continue
+                ;;
+        esac
+
         db_name="${line%%:*}"
         db_user="${line##*:}"
 
-        if [ -z "$db_name" ] || [ -z "$db_user" ] || [ "$db_name" = "$db_user" ]; then
+        if [ -z "$db_name" ] || [ -z "$db_user" ]; then
             echo "⚠️  Skipping malformed line (expected 'database:user'): $line"
             continue
         fi
