@@ -1,0 +1,43 @@
+\
+# Template systemd unit — one Purrgres instance per database.
+#
+# Install:
+#   sudo cp purrgres@.service /etc/systemd/system/
+#
+# Configure per-instance settings via an environment file named after the
+# instance, e.g. for `analytics` create /etc/purrgres/analytics.env:
+#
+#   PURRGRES_BIN=/opt/purrgres/purrgres
+#   PURRGRES_CONTAINER=postgres
+#   PURRGRES_DATABASE=analytics
+#   PURRGRES_USER=app_user
+#   PURRGRES_HOME=/var/lib/purrgres/analytics
+#
+# Enable and start:
+#   sudo systemctl enable --now purrgres@analytics
+#
+# View logs:
+#   journalctl -u purrgres@analytics -f
+
+[Unit]
+Description=Purrgres backup monitor (%i)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/purrgres/%i.env
+Environment=HOME=%h
+ExecStart=/bin/sh -c 'HOME="${PURRGRES_HOME}" exec "${PURRGRES_BIN}" --container "${PURRGRES_CONTAINER}" --user "${PURRGRES_USER}" --database "${PURRGRES_DATABASE}"'
+Restart=on-failure
+RestartSec=10
+User=purrgres
+Group=purrgres
+
+# Hardening (optional, relax if it breaks your setup)
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/purrgres
+
+[Install]
+WantedBy=multi-user.target

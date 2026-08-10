@@ -1,0 +1,9 @@
+# List of databases to back up with Purrgres, one per line.
+# Format: <database>:<user>
+#
+# Lines starting with # and empty lines are ignored.
+# Copy this file (e.g. to databases.conf) and adjust it to your setup.
+
+analytics:app_user
+billing:billing_user
+main:app_user
