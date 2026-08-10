@@ -19,6 +19,13 @@ cp databases.conf.example databases.conf
   -c databases.conf
 ```
 
+To add new database:
+
+```bash
+echo "new_database:user" >> databases.conf
+./run-multi.sh -c databases.conf
+```
+
 All flags can also be set via environment variables (`PURRGRES_CONTAINER`,
 `PURRGRES_BIN`, `PURRGRES_BKP_DIR`) — handy for wrapping in your own deploy
 scripts.
