@@ -111,7 +111,7 @@ chmod +x purrgres
 Requires [Rust](https://www.rust-lang.org/tools/install) (1.70+).
 
 ```bash
-git clone https://github.com/hi-im-aurelio/purrgres.git
+git clone https://github.com/fariosofernando/Purrgres.git
 cd purrgres
 cargo build --release
 
