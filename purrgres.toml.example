@@ -1,0 +1,21 @@
+# ~/.purrgres/purrgres.toml
+
+# ── Client: send backups to remote after each dump ──
+[remote]
+enabled = true
+host = "192.168.1.50"
+port = 8443
+api_key = "your-secret-key"
+compress = true
+
+# ── Server: receive backups from clients ──
+[server]
+port = 8443
+storage_path = "/var/lib/purrgres/backups"
+api_key = "your-secret-key"
+max_upload_size_mb = 500
+max_remote_backups = 30
+
+# ── Retention: auto-cleanup ──
+[retention]
+max_local_backups = 7

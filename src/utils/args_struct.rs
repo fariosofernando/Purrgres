@@ -1,17 +1,17 @@
-use clap::{command, Parser};
+use clap::Parser;
 
 #[derive(Parser, Debug)]
 #[command(name = "purrgres")]
 #[command(about = "An automatic backup tool for PostgreSQL in Docker containers.")]
 #[command(version = env!("CARGO_PKG_VERSION"))]
 pub struct Args {
-    #[arg(short, long, help = "PostgreSQL User", required_unless_present_any = ["stats", "stop", "list_purrs"])]
+    #[arg(short, long, help = "PostgreSQL User", required_unless_present_any = ["stats", "stop", "list_purrs", "server"])]
     pub user: Option<String>,
 
-    #[arg(short, long, help = "Database name", required_unless_present_any = ["stats", "stop", "list_purrs"])]
+    #[arg(short, long, help = "Database name", required_unless_present_any = ["stats", "stop", "list_purrs", "server"])]
     pub database: Option<String>,
 
-    #[arg(short, long, help = "Container name", required_unless_present_any = ["stats", "stop", "list_purrs"])]
+    #[arg(short, long, help = "Container name", required_unless_present_any = ["stats", "stop", "list_purrs", "server"])]
     pub container: Option<String>,
 
     #[arg(long, help = "Checks the status of the running backup.")]
@@ -25,4 +25,13 @@ pub struct Args {
 
     #[arg(long, help = "Applies a backup from a file")]
     pub rpurry: Option<String>,
+
+    #[arg(long, help = "Start in server mode (receive backups via API)")]
+    pub server: bool,
+
+    #[arg(long, help = "Path to purrgres.toml config file")]
+    pub config: Option<String>,
+
+    #[arg(long, help = "Override server port", requires = "server")]
+    pub port: Option<u16>,
 }

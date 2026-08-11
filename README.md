@@ -1,184 +1,724 @@
-<img width="150px" src="https://github.com/hi-im-aurelio/purrgres/raw/master/static/icone.webp">
+<p align="center">
+  <img width="150px" src="https://github.com/hi-im-aurelio/purrgres/raw/master/static/icone.webp">
+</p>
 
-# Purrgres - Backup Tool for PostgreSQL
+<h1 align="center">Purrgres</h1>
 
-Purrgres is an automated PostgreSQL backup tool, specially tailored for environments using Docker containers. It allows you to perform daily backups of your PostgreSQL database, restore specific backups, and view the history of backups performed. With automatic intervals every 24 hours, Purrgres reduces the manual effort to ensure data security and recovery.
+<p align="center">
+  An automated backup tool for PostgreSQL in Docker containers — with remote sync, retention policies, and a built-in receiver server.
+</p>
 
-> Purrgres is a play on Postgres, but with a “purr” feel, as if it were
-> a kitten taking care of the bank.
+> **Purrgres** is a play on _Postgres_, but with a _"purr"_ feel — as if a kitten were taking care of your database. 🐱
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Installation](#installation)
+  - [Download Binary](#download-binary)
+  - [Compile from Source](#compile-from-source)
+  - [Add to PATH](#add-to-path)
+- [Configuration](#configuration)
+  - [Config File (`purrgres.toml`)](#config-file-purrgrestoml)
+  - [Full Example](#full-config-example)
+- [Usage — Client Mode (Backups)](#usage--client-mode-backups)
+  - [Start a Backup Process](#start-a-backup-process)
+  - [Run in Background](#run-in-background)
+  - [List Backups](#list-backups)
+  - [Restore a Backup](#restore-a-backup)
+  - [Check Status](#check-status)
+  - [Stop the Backup Process](#stop-the-backup-process)
+- [Usage — Server Mode (Receive Backups)](#usage--server-mode-receive-backups)
+  - [Start the Server](#start-the-server)
+  - [API Endpoints](#api-endpoints)
+  - [Testing the Server](#testing-the-server)
+- [Remote Backup Sync](#remote-backup-sync)
+  - [How It Works](#how-it-works)
+  - [Checksum Verification](#checksum-verification)
+- [Retention Policies](#retention-policies)
+- [Multi-Database Backups](#multi-database-backups)
+  - [Config File Format](#config-file-format)
+  - [Running Multiple Instances](#running-multiple-instances)
+  - [Environment Variables](#environment-variables)
+- [Running as a Systemd Service](#running-as-a-systemd-service)
+- [CLI Reference](#cli-reference)
+- [Semantic Versioning](#semantic-versioning)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
 
 ## Features
 
-- **Automatic backup**: Performs backups of a PostgreSQL database in an automated way.
-- **Restore backups**: You can restore backups directly from the file.
-- **List backups**: Displays the list of backups performed, including date and time.
-- **Check backup status**: Monitor the status of the running backup process.
-- **Stop running backup**: Stop the backup process if necessary.
+- **Automatic backups** — Runs `pg_dump` on a Docker container every 24 hours automatically.
+- **Restore backups** — Restore any `.sql` backup directly into the database.
+- **List backups** — View all backups performed, with dates and restore points.
+- **Monitor status** — Check if a backup process is running, and for how long.
+- **Remote sync** — Automatically send backups to a remote Purrgres server after each dump.
+- **Server mode** — Turn any machine into a backup receiver with a built-in API.
+- **Checksum verification** — SHA256 integrity check on every remote transfer.
+- **Compression** — Optional gzip compression before sending backups remotely.
+- **Retention policies** — Automatically delete old backups (locally and remotely).
+- **Multi-database support** — Orchestrate isolated backup processes for multiple databases via a helper script.
+- **Retry on failure** — Remote sends retry up to 3 times with exponential backoff.
 
-## Semantic Versioning
+---
 
-This project follows [Semantic Versioning (SemVer)](https://semver.org/lang/en-US/), ensuring that versions are consistent and transparent. The version number is composed of three parts:
+## Quick Start
 
-- **MAJOR**: Incompatible API changes that may break backwards compatibility.
-- **MINOR**: Feature additions in a backwards compatible way.
-- **PATCH**: Bug fixes and performance improvements, without significant API changes.
+```bash
+# 1. Download or compile purrgres (see Installation below)
 
-### Example:
+# 2. Start backing up a database (foreground)
+purrgres --user postgres --database mydb --container my_postgres_container
 
-- `1.0.0` - First stable release.
-- `0.1.0` - New features added in a backwards compatible way.
-- `0.1.1` - Bug fixes.
+# 3. Or run in background
+nohup purrgres -u postgres -d mydb -c my_container > /dev/null 2>&1 &
 
-Version transitions will be done according to SemVer principles, and any significant updates will be reflected in the version number.
+# 4. Check status
+purrgres --stats
 
-## How to Use
+# 5. List backups
+purrgres --list-purrs
+
+# 6. Restore a backup
+purrgres --rpurry 11_08_2026_03_00_backup.sql -u postgres -d mydb -c my_container
+```
+
+---
+
+## Installation
 
 ### Download Binary
 
-Binaries are made available with each release for Linux operating systems, you can download the compiled version of `purrgres` for your operating
-system directly from the releases section of the [repository](https://github.com/hi-im-aurelio/purrgres/releases). There is no need to compile the
-source code manually if you are a Linux user.
-
-Once downloaded, unpack the file:
+Pre-compiled binaries for Linux are available on the [Releases](https://github.com/hi-im-aurelio/purrgres/releases) page.
 
 ```bash
-    tar -xvf /<you-download-path>/purrgres*.tar.gz
+# Download and extract
+tar -xvf purrgres-*.tar.gz
+
+# Make it executable
+chmod +x purrgres
+
+# Test it
+./purrgres --version
 ```
 
-Check for the execution bit:
+### Compile from Source
 
-```bash
-    chmod +x purrgres
-```
-
-And then execute Purrgres:
-
-```bash
-    ./purrgres
-```
-
-Include the directory Purrgres is in, in your PATH Variable if you wish to be able to execute it anywhere.
-
-Bash:
-
-```bash
-    echo 'export PATH="$PATH":"$HOME/<purrgres-path>"' >> ~/.bashrc
-```
-
-Zsh:
-
-```bash
-    echo 'export PATH="$PATH":"$HOME/<purrgres-path>"' >> ~/.zshrc
-```
-
-### Use via Command Line
-
-1. **List Backups Performed**:
-   Displays all backups performed so far.
-
-    ```bash
-    ./purrgres --list-purrs
-    ```
-
-2. **Restore a Backup**
-   To restore a backup from a .sql file, use the --rpurry option.
-
-    ```bash
-    ./purrgres --rpurry backup.sql --user <USER> --database <DATABASE> --container <CONTAINER>
-
-    ```
-
-3. **Check Running Backup Status**
-   Shows the status of the current backup, if any process is running.
-
-    ```bash
-    ./purrgres --stats
-
-    ```
-
-4. **Stop the Backup Process**
-   If the backup process is in progress, you can stop it.
-
-    ```bash
-    ./purrgres --stop
-
-    ```
-
-## How to Run Purrgres
-
-Purrgres can be run in different ways, depending on how you want the process to be managed.
-
-1. **Direct (foreground) execution**
-
-```bash
-./purrgres --user <your-data-owner> --database <your-database-name> --container <your-database-container-name>
-```
-
-When you run the command directly, the process will run in the foreground in the terminal. This means that the terminal will be "locked" while the process is running, and you will not be able to use the terminal for other tasks while the backup is being performed. In addition, if you close the terminal or the SSH session (if you are working remotely), the process will be stopped.
-
-### When to use:
-
-- Ideal for quick tests or when you want to monitor the execution
-  of the program directly in the terminal.
-
-- Useful when you want to interact with the program and observe log
-  messages or results in real time.
-
-2. **Background Execution (with nohup)**
-
-```bash
-nohup ./purrgres --user <your-data-owner> --database <your-database-name> --container <your-database-container-name> > /dev/null 2>&1 &
-```
-
-Running with nohup allows the program to run in the background. The nohup (no hang-up) command ensures that the process continues to run even if you close the terminal or SSH session. The & operator puts the process in the background, allowing you to continue using the terminal for other tasks. The > /dev/null 2>&1 redirection causes the program's standard output and errors to be discarded (not displayed in the terminal), which is useful when you don't want to see the log messages, but still want the process to continue running in the background.
-
-### When to use:
-
-- Ideal for long or automatic backups that need to be executed continuously, without interfering with your interaction with the terminal.
-
-- Necessary when you want to run the process in the background and continue using the terminal for other activities.
-
-- Useful for running the program on a remote server where you do not want to lose the backup execution if the SSH session is disconnected.
-
-Main Differences
-
-| Execution                | In the Foreground                                                                                                | In Background (with `nohup`)                                                                                                              |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| **Command**              | `./purrgres --user <your-data-owner> --database <your-database-name> --container <your-database-container-name>` | `nohup ./purrgres --user <your-data-owner> --database <your-database-name> --container <your-database-container-name> > /dev/null 2>&1 &` |
-| **Behavior**             | The terminal is busy while the process is running.                                                               | The process runs in the background, and the terminal is freed up.                                                                         |
-| **Monitoring**           | You will see the output directly in the terminal.                                                                | The output is redirected to `/dev/null` and does not appear in the terminal.                                                              |
-| **Interaction**          | You can interact with the program in the terminal.                                                               | The program runs in the background without direct interaction.                                                                            |
-| **SSH/Terminal Session** | If the terminal is closed, the process is stopped.                                                               | The process will continue running even if the session is closed.                                                                          |
-
-## How to Compile
-
-If you want to compile the source code yourself, follow these steps:
-
-1. **Clone the repository**
+Requires [Rust](https://www.rust-lang.org/tools/install) (1.70+).
 
 ```bash
 git clone https://github.com/hi-im-aurelio/purrgres.git
 cd purrgres
+cargo build --release
+
+# Binary will be at: target/release/purrgres
 ```
 
-2. **Compile the project**
+### Add to PATH
+
+To run `purrgres` from anywhere:
+
+**Bash:**
 
 ```bash
-cargo build --release
+echo 'export PATH="$PATH:/path/to/purrgres/directory"' >> ~/.bashrc
+source ~/.bashrc
 ```
 
-The binary will be generated in the target/release/purrgres folder.
-You can move it to the desired directory or use the cargo install command
-to install it globally.
+**Zsh:**
 
-## Contributions
+```bash
+echo 'export PATH="$PATH:/path/to/purrgres/directory"' >> ~/.zshrc
+source ~/.zshrc
+```
 
-If you would like to contribute to the project, feel free to open pull
-requests or report issues.
+Or copy the binary directly:
 
-Be sure to follow coding best practices and provide
-clear descriptions of your changes.
+```bash
+sudo cp purrgres /usr/local/bin/
+```
+
+---
+
+## Configuration
+
+Purrgres works out of the box with **zero configuration** — just pass the CLI flags. But for advanced features (remote sync, retention, server mode), you can create a config file.
+
+### Config File (`purrgres.toml`)
+
+Place it at `~/.purrgres/purrgres.toml`, or specify a custom path with `--config`.
+
+```bash
+mkdir -p ~/.purrgres
+nano ~/.purrgres/purrgres.toml
+```
+
+### Full Config Example
+
+```toml
+# ─────────────────────────────────────────────────
+# Remote Sync (Client Side)
+# After each backup, send it to a remote server.
+# ─────────────────────────────────────────────────
+[remote]
+enabled = true                     # Set to false to disable remote sync
+host = "192.168.1.50"              # IP or hostname of the Purrgres server
+port = 8443                        # Port the server is listening on
+api_key = "your-secret-api-key"    # Must match the server's api_key
+compress = true                    # gzip the backup before sending (recommended)
+
+# ─────────────────────────────────────────────────
+# Server Mode
+# Turn this machine into a backup receiver.
+# Only needed on the machine that RECEIVES backups.
+# ─────────────────────────────────────────────────
+[server]
+port = 8443                                      # Port to listen on
+storage_path = "/var/lib/purrgres/backups"        # Where to store received backups
+api_key = "your-secret-api-key"                   # Clients must send this key
+max_upload_size_mb = 500                          # Max file size per upload (in MB)
+max_remote_backups = 30                           # Keep only the last 30 backups
+
+# ─────────────────────────────────────────────────
+# Retention (Client Side)
+# Automatically delete old local backups.
+# ─────────────────────────────────────────────────
+[retention]
+max_local_backups = 7              # Keep only the last 7 backups locally
+```
+
+> **Note:** You don't need all sections. Use only what you need:
+> - Just doing local backups? → No config file needed.
+> - Want remote sync? → Add `[remote]` section.
+> - Setting up a receiver? → Add `[server]` section.
+> - Want auto-cleanup? → Add `[retention]` section.
+
+---
+
+## Usage — Client Mode (Backups)
+
+Client mode is the default. It performs `pg_dump` on a PostgreSQL database running inside a Docker container.
+
+### Start a Backup Process
+
+```bash
+purrgres --user <PG_USER> --database <DB_NAME> --container <DOCKER_CONTAINER>
+
+# Short flags
+purrgres -u postgres -d mydb -c my_postgres_container
+```
+
+This will:
+1. Run `pg_dump` immediately.
+2. Save the backup to `~/.purrgres/<date>_backup.sql`.
+3. If `[remote]` is enabled, compress and send it to the remote server.
+4. If `[retention]` is configured, delete old backups beyond the limit.
+5. Repeat every **24 hours**.
+
+### Run in Background
+
+For production, run Purrgres in the background so it survives terminal closure:
+
+```bash
+nohup purrgres -u postgres -d mydb -c my_container > /dev/null 2>&1 &
+```
+
+| Method | Command | Terminal Closes → Process... |
+|---|---|---|
+| Foreground | `purrgres -u ... -d ... -c ...` | ❌ Stops |
+| Background | `nohup purrgres ... > /dev/null 2>&1 &` | ✅ Keeps running |
+| Systemd | `systemctl start purrgres@mydb` | ✅ Keeps running + auto-restarts |
+
+### List Backups
+
+```bash
+purrgres --list-purrs
+```
+
+Output:
+
+```
+======================================================================
+   backups                 |    date              | restore point
+======================================================================
+11_08_2026_03_00_backup.sql | 11/08/2026 03:00    | last
+10_08_2026_03_00_backup.sql | 10/08/2026 03:00    |
+09_08_2026_03_00_backup.sql | 09/08/2026 03:00    |
+======================================================================
+```
+
+### Restore a Backup
+
+```bash
+purrgres --rpurry <BACKUP_FILENAME> -u <PG_USER> -d <DB_NAME> -c <CONTAINER>
+```
+
+Example:
+
+```bash
+purrgres --rpurry 11_08_2026_03_00_backup.sql -u postgres -d mydb -c my_container
+```
+
+This will:
+1. Copy the backup file into the Docker container.
+2. Run `psql` to apply it.
+3. Log the restore in `~/.purrgres/.purrs`.
+
+### Check Status
+
+```bash
+purrgres --stats
+```
+
+Output:
+
+```
+=== Status purrgres ===
+Backup running: PID: 12345
+Execution time: 2h 30m 15s
+=========================
+```
+
+### Stop the Backup Process
+
+```bash
+purrgres --stop
+```
+
+---
+
+## Usage — Server Mode (Receive Backups)
+
+Server mode turns a machine into a **backup receiver**. It runs an HTTP API that accepts backup files from Purrgres clients.
+
+```
+┌─────────────────────┐        HTTP POST         ┌─────────────────────┐
+│  Machine A (prod)   │  ──── backup.sql.gz ───► │  Machine B (vault)  │
+│  purrgres (client)  │  ◄──── 200 OK ─────────  │  purrgres --server  │
+└─────────────────────┘                           └─────────────────────┘
+```
+
+### Start the Server
+
+**1. Create the config file** on the receiver machine:
+
+```bash
+mkdir -p ~/.purrgres
+cat > ~/.purrgres/purrgres.toml << 'EOF'
+[server]
+port = 8443
+storage_path = "/var/lib/purrgres/backups"
+api_key = "your-secret-api-key"
+max_upload_size_mb = 500
+max_remote_backups = 30
+EOF
+```
+
+**2. Create the storage directory:**
+
+```bash
+sudo mkdir -p /var/lib/purrgres/backups
+sudo chown $USER:$USER /var/lib/purrgres/backups
+```
+
+**3. Start the server:**
+
+```bash
+purrgres --server
+```
+
+Output:
+
+```
+🐱 Purrgres server listening on 0.0.0.0:8443
+   Storage: /var/lib/purrgres/backups
+   Max upload: 500 MB
+```
+
+**4. For production, run in background or as a systemd service:**
+
+```bash
+nohup purrgres --server > /var/log/purrgres-server.log 2>&1 &
+```
+
+**Optional:** Override the port via CLI:
+
+```bash
+purrgres --server --port 9090
+```
+
+**Optional:** Use a custom config file:
+
+```bash
+purrgres --server --config /etc/purrgres/purrgres.toml
+```
+
+### API Endpoints
+
+| Endpoint | Method | Auth Required | Description |
+|---|---|---|---|
+| `/api/health` | GET | ❌ No | Health check — returns version and status |
+| `/api/upload` | POST | ✅ Yes | Upload a backup file (multipart form) |
+| `/api/backups` | GET | ✅ Yes | List all received backups |
+
+**Authentication:** Send the API key in the `X-API-Key` header.
+
+### Testing the Server
+
+```bash
+# Health check (no auth needed)
+curl http://localhost:8443/api/health
+
+# Upload a backup
+echo "CREATE TABLE test;" > /tmp/test.sql
+CHECKSUM=$(sha256sum /tmp/test.sql | awk '{print $1}')
+
+curl -X POST http://localhost:8443/api/upload \
+  -H "X-API-Key: your-secret-api-key" \
+  -H "X-Checksum-SHA256: $CHECKSUM" \
+  -F "file=@/tmp/test.sql"
+
+# List received backups
+curl -H "X-API-Key: your-secret-api-key" http://localhost:8443/api/backups
+```
+
+---
+
+## Remote Backup Sync
+
+When `[remote]` is enabled in the config, Purrgres will **automatically send each backup** to the remote server immediately after it's created.
+
+### How It Works
+
+```
+1. pg_dump runs → saves backup.sql locally
+2. Compresses → backup.sql.gz (if compress = true)
+3. Computes SHA256 checksum
+4. Sends to remote server via POST /api/upload
+   - Includes X-API-Key header
+   - Includes X-Checksum-SHA256 header
+5. Server receives, verifies checksum, saves file
+6. If it fails → retries up to 3 times (5s, 10s, 15s delays)
+```
+
+**Client config** (on the machine that makes backups):
+
+```toml
+[remote]
+enabled = true
+host = "192.168.1.50"
+port = 8443
+api_key = "your-secret-api-key"
+compress = true
+```
+
+**Server config** (on the machine that receives backups):
+
+```toml
+[server]
+port = 8443
+storage_path = "/var/lib/purrgres/backups"
+api_key = "your-secret-api-key"
+max_upload_size_mb = 500
+max_remote_backups = 30
+```
+
+### Checksum Verification
+
+Every backup transfer includes a **SHA256 checksum** to ensure the file wasn't corrupted during transfer:
+
+- The **client** calculates the SHA256 hash of the file before sending.
+- The **server** recalculates the SHA256 hash after receiving.
+- If they **don't match**, the server rejects the file with a `400 Checksum mismatch` error.
+- The upload response includes `checksum_verified: true` on success.
+
+This protects against network corruption, partial uploads, and tampered files — critical when dealing with database backups for disaster recovery.
+
+---
+
+## Retention Policies
+
+Purrgres can automatically delete old backups to prevent disk space from filling up.
+
+### Local Retention (Client Side)
+
+Add to `~/.purrgres/purrgres.toml`:
+
+```toml
+[retention]
+max_local_backups = 7    # Keep only the 7 most recent backups
+```
+
+After each backup, Purrgres will count `.sql` and `.sql.gz` files in `~/.purrgres/`. If there are more than `max_local_backups`, the oldest files are deleted automatically.
+
+### Remote Retention (Server Side)
+
+Add to the server's `purrgres.toml`:
+
+```toml
+[server]
+# ... other settings ...
+max_remote_backups = 30    # Keep only the 30 most recent backups
+```
+
+After each upload is received, the server will delete the oldest files if the count exceeds `max_remote_backups`.
+
+### Example
+
+With `max_local_backups = 3`, after one week of daily backups:
+
+```
+Day 1: backup_01.sql  ← deleted on Day 4
+Day 2: backup_02.sql  ← deleted on Day 5
+Day 3: backup_03.sql  ← deleted on Day 6
+Day 4: backup_04.sql  ← deleted on Day 7
+Day 5: backup_05.sql  ✅ kept
+Day 6: backup_06.sql  ✅ kept
+Day 7: backup_07.sql  ✅ kept
+```
+
+> **Tip:** If `[retention]` is not defined, no automatic cleanup occurs — all backups are kept indefinitely.
+
+---
+
+## Multi-Database Backups
+
+If your Docker container hosts **multiple PostgreSQL databases**, you can use the included `run-multi.sh` script to orchestrate one Purrgres instance per database.
+
+Each instance runs in the background with its own isolated `$HOME`, so PID files, logs, and backup history don't collide between databases.
+
+### Config File Format
+
+Create a config file listing your databases, one per line, in `database:user` format:
+
+```bash
+cp scripts/databases.conf.example databases.conf
+nano databases.conf
+```
+
+```conf
+# Format: database:user
+# Lines starting with # are ignored. Empty lines are ignored.
+
+analytics:app_user
+billing:billing_user
+main:postgres
+```
+
+### Running Multiple Instances
+
+```bash
+./scripts/run-multi.sh -c databases.conf
+```
+
+Output:
+
+```
+▶ Starting backup monitor for database [analytics] (user: app_user)...
+▶ Starting backup monitor for database [billing] (user: billing_user)...
+▶ Starting backup monitor for database [main] (user: postgres)...
+--------------------------------------------------------
+Started/checked 3 Purrgres instance(s) in background.
+Backups will land in: /home/user/purrgres_backups/<database>/
+Per-instance logs:    /home/user/purrgres_backups/<database>/.purrs/purrgres.log
+--------------------------------------------------------
+```
+
+### Script Options
+
+```bash
+./scripts/run-multi.sh -c <config_file> [options]
+```
+
+| Flag | Description | Default |
+|---|---|---|
+| `-c, --config <file>` | Path to the database list file | **(required)** |
+| `--container <name>` | Docker container name | `$PURRGRES_CONTAINER` or `postgres` |
+| `--bin <path>` | Path to the `purrgres` binary | `$PURRGRES_BIN` or `purrgres` in PATH |
+| `--backup-dir <path>` | Base directory for backups | `$PURRGRES_BKP_DIR` or `~/purrgres_backups` |
+| `-h, --help` | Show help | — |
+
+### Environment Variables
+
+Instead of passing flags every time, you can set environment variables:
+
+```bash
+export PURRGRES_CONTAINER="my_postgres"
+export PURRGRES_BIN="/usr/local/bin/purrgres"
+export PURRGRES_BKP_DIR="/backups/purrgres"
+
+./scripts/run-multi.sh -c databases.conf
+```
+
+### Directory Structure
+
+After running, the backup directory will look like:
+
+```
+~/purrgres_backups/
+├── analytics/
+│   ├── .purrgres/
+│   │   ├── 11_08_2026_03_00_backup.sql
+│   │   └── 12_08_2026_03_00_backup.sql
+│   └── .purrs/
+│       ├── purrgres.log
+│       └── purrgres.pid
+├── billing/
+│   ├── .purrgres/
+│   │   └── ...
+│   └── .purrs/
+│       └── ...
+└── main/
+    └── ...
+```
+
+### Re-running the Script
+
+The script is **idempotent** — if an instance is already running for a database, it will skip it:
+
+```
+⚠️  Instance for [analytics] already running (PID 12345). Skipping.
+▶ Starting backup monitor for database [billing] (user: billing_user)...
+```
+
+---
+
+## Running as a Systemd Service
+
+A systemd service template is included for running Purrgres as a managed service.
+
+### Setup
+
+```bash
+# Copy the service file
+sudo cp systemd/purrgres@.service /etc/systemd/system/
+
+# Reload systemd
+sudo systemctl daemon-reload
+
+# Start a backup for a specific database
+sudo systemctl start purrgres@mydb
+
+# Enable auto-start on boot
+sudo systemctl enable purrgres@mydb
+
+# Check status
+sudo systemctl status purrgres@mydb
+
+# View logs
+journalctl -u purrgres@mydb -f
+```
+
+> **Note:** You may need to edit the service file to set the correct `User`, `ExecStart` path, and environment variables for your setup.
+
+### Running the Server as a Service
+
+You can also run the server mode as a systemd service. Create `/etc/systemd/system/purrgres-server.service`:
+
+```ini
+[Unit]
+Description=Purrgres Backup Receiver Server
+After=network.target
+
+[Service]
+Type=simple
+User=purrgres
+ExecStart=/usr/local/bin/purrgres --server --config /etc/purrgres/purrgres.toml
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now purrgres-server
+```
+
+---
+
+## CLI Reference
+
+```
+purrgres [OPTIONS]
+```
+
+| Flag | Short | Description | Required |
+|---|---|---|---|
+| `--user <USER>` | `-u` | PostgreSQL user | Yes (client mode) |
+| `--database <DB>` | `-d` | Database name | Yes (client mode) |
+| `--container <NAME>` | `-c` | Docker container name | Yes (client mode) |
+| `--stats` | | Show status of running backup | No |
+| `--stop` | | Stop the running backup process | No |
+| `--list-purrs` | | List all performed backups | No |
+| `--rpurry <FILE>` | | Restore a backup from file | No |
+| `--server` | | Start in server mode (API) | No |
+| `--config <PATH>` | | Path to `purrgres.toml` | No |
+| `--port <PORT>` | | Override server port (requires `--server`) | No |
+| `--version` | | Show version | No |
+| `--help` | `-h` | Show help | No |
+
+### Examples
+
+```bash
+# Basic backup
+purrgres -u postgres -d mydb -c my_container
+
+# Background backup
+nohup purrgres -u postgres -d mydb -c my_container > /dev/null 2>&1 &
+
+# Check status
+purrgres --stats
+
+# List backups
+purrgres --list-purrs
+
+# Restore
+purrgres --rpurry 11_08_2026_03_00_backup.sql -u postgres -d mydb -c my_container
+
+# Stop
+purrgres --stop
+
+# Start server
+purrgres --server
+
+# Server with custom config and port
+purrgres --server --config /etc/purrgres/purrgres.toml --port 9090
+```
+
+---
+
+## Semantic Versioning
+
+This project follows [Semantic Versioning (SemVer)](https://semver.org/):
+
+| Part | When it changes | Example |
+|---|---|---|
+| **MAJOR** (X.0.0) | Incompatible/breaking API changes | `1.0.0` → `2.0.0` |
+| **MINOR** (0.X.0) | New features, backwards compatible | `1.0.0` → `1.1.0` |
+| **PATCH** (0.0.X) | Bug fixes, no API changes | `1.0.0` → `1.0.1` |
+
+---
+
+## Contributing
+
+Contributions are welcome! Feel free to open pull requests or report issues.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/my-feature`)
+3. Commit your changes (`git commit -m 'Add my feature'`)
+4. Push to the branch (`git push origin feature/my-feature`)
+5. Open a Pull Request
+
+Please follow coding best practices and provide clear descriptions of your changes.
+
+---
 
 ## License
 
-This project is licensed under the [MIT License](./LICENSE) - see the LICENSE file for more details.
+This project is licensed under the [MIT License](./LICENSE) — see the LICENSE file for details.
