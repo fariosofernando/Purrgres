@@ -15,11 +15,10 @@ async fn main() {
 
     // ── Load config (needed for both modes) ──
     let config_path = args.config.as_ref().map(|p| PathBuf::from(p));
-    let config = utils::config::Config::load(config_path.as_deref())
-        .unwrap_or_else(|e| {
-            eprintln!("Warning: {}", e);
-            utils::config::Config::default()
-        });
+    let config = utils::config::Config::load(config_path.as_deref()).unwrap_or_else(|e| {
+        eprintln!("Warning: {}", e);
+        utils::config::Config::default()
+    });
 
     // ── Server mode ──
     if args.server {
@@ -108,7 +107,10 @@ async fn main() {
     // ── Check remote config once before loop ──
     let remote_config = config.remote.as_ref().filter(|r| r.enabled);
     if remote_config.is_some() {
-        println!("📡 Remote sending enabled → {}", remote_config.unwrap().host);
+        println!(
+            "📡 Remote sending enabled → {}",
+            remote_config.unwrap().host
+        );
     }
 
     let retention_max = config.retention.as_ref().map(|r| r.max_local_backups);
@@ -118,11 +120,13 @@ async fn main() {
 
     loop {
         interval.tick().await;
+        let db_name = args.database.clone().expect("Database name required");
 
         let now = Local::now();
         let file_name = format!(
-            "{}/{}_backup.sql",
+            "{}/{}_{}_backup.sql",
             tool_path.to_str().expect("Failed to get backup folder."),
+            db_name,
             now.format("%d_%m_%Y_%H_%M"),
         );
 
@@ -146,13 +150,19 @@ async fn main() {
             println!("=== Backup complete ===");
             println!("Backup saved in: {}", file_name);
 
-            // ── Send to remote if enabled ──
             if let Some(remote) = &config.remote {
                 if remote.enabled {
+                    // jitter
+                    let jitter_secs = rand::random::<u64>() % 30; // 0–29s
+                    if jitter_secs > 0 {
+                        println!("Waiting {}s before remote sync (jitter)...", jitter_secs);
+                        tokio::time::sleep(std::time::Duration::from_secs(jitter_secs)).await;
+                    }
+
                     let backup_path = std::path::Path::new(&file_name);
                     match utils::remote::send_backup(backup_path, remote).await {
-                        Ok(_) => println!("✅ Remote sync complete"),
-                        Err(e) => eprintln!("❌ Remote sync failed: {}", e),
+                        Ok(_) => println!("Remote sync complete"),
+                        Err(e) => eprintln!("Remote sync failed: {}", e),
                     }
                 }
             }

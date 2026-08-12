@@ -229,9 +229,9 @@ nohup purrgres -u postgres -d mydb -c my_container > /dev/null 2>&1 &
 
 | Method | Command | Terminal Closes → Process... |
 |---|---|---|
-| Foreground | `purrgres -u ... -d ... -c ...` | ❌ Stops |
-| Background | `nohup purrgres ... > /dev/null 2>&1 &` | ✅ Keeps running |
-| Systemd | `systemctl start purrgres@mydb` | ✅ Keeps running + auto-restarts |
+| Foreground | `purrgres -u ... -d ... -c ...` |  Stops |
+| Background | `nohup purrgres ... > /dev/null 2>&1 &` |  Keeps running |
+| Systemd | `systemctl start purrgres@mydb` |  Keeps running + auto-restarts |
 
 ### List Backups
 
@@ -361,9 +361,9 @@ purrgres --server --config /etc/purrgres/purrgres.toml
 
 | Endpoint | Method | Auth Required | Description |
 |---|---|---|---|
-| `/api/health` | GET | ❌ No | Health check — returns version and status |
-| `/api/upload` | POST | ✅ Yes | Upload a backup file (multipart form) |
-| `/api/backups` | GET | ✅ Yes | List all received backups |
+| `/api/health` | GET |  No | Health check — returns version and status |
+| `/api/upload` | POST |  Yes | Upload a backup file (multipart form) |
+| `/api/backups` | GET |  Yes | List all received backups |
 
 **Authentication:** Send the API key in the `X-API-Key` header.
 
@@ -476,9 +476,9 @@ Day 1: backup_01.sql  ← deleted on Day 4
 Day 2: backup_02.sql  ← deleted on Day 5
 Day 3: backup_03.sql  ← deleted on Day 6
 Day 4: backup_04.sql  ← deleted on Day 7
-Day 5: backup_05.sql  ✅ kept
-Day 6: backup_06.sql  ✅ kept
-Day 7: backup_07.sql  ✅ kept
+Day 5: backup_05.sql   kept
+Day 6: backup_06.sql   kept
+Day 7: backup_07.sql   kept
 ```
 
 > **Tip:** If `[retention]` is not defined, no automatic cleanup occurs — all backups are kept indefinitely.
@@ -581,7 +581,7 @@ After running, the backup directory will look like:
 The script is **idempotent** — if an instance is already running for a database, it will skip it:
 
 ```
-⚠️  Instance for [analytics] already running (PID 12345). Skipping.
+Instance for [analytics] already running (PID 12345). Skipping.
 ▶ Starting backup monitor for database [billing] (user: billing_user)...
 ```
 

@@ -84,8 +84,8 @@ pub async fn start(config: ServerConfig, port_override: Option<u16>) -> Result<(
 
     let addr = format!("0.0.0.0:{}", port);
     println!("🐱 Purrgres server listening on {}", addr);
-    println!("   Storage: {}", storage_display.display());
-    println!("   Max upload: {} MB", max_body / (1024 * 1024));
+    println!("Storage: {}", storage_display.display());
+    println!("Max upload: {} MB", max_body / (1024 * 1024));
 
     let listener = tokio::net::TcpListener::bind(&addr)
         .await

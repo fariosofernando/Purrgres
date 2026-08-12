@@ -88,7 +88,9 @@ pub fn list_backups(tool_path: &Path) {
                 .unwrap_or_default();
             if path.is_file() && (name.ends_with(".sql") || name.ends_with(".sql.gz")) {
                 let metadata = fs::metadata(&path).expect("Error getting file metadata");
-                let created = metadata.created().expect("Error getting creation date");
+                let created = metadata
+                    .modified()
+                    .expect("Error getting modification date");
 
                 if let Ok(duration_since_epoch) = created.duration_since(SystemTime::UNIX_EPOCH) {
                     let created_naive = chrono::DateTime::from_timestamp(
@@ -123,6 +125,8 @@ pub fn list_backups(tool_path: &Path) {
         }
     }
 
+    backups.sort_by(|a, b| b.1.cmp(&a.1));
+
     println!("======================================================================");
     println!(
         "{:<27} | {:<20} | {:<20}",
@@ -137,7 +141,6 @@ pub fn list_backups(tool_path: &Path) {
 
     println!("======================================================================");
 }
-
 fn read_last_restored() -> Option<String> {
     let log_file_path = get_bkp_path().join(".purrs");
 

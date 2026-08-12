@@ -8,8 +8,7 @@ use std::path::Path;
 use super::config::RemoteConfig;
 
 pub async fn send_backup(file_path: &Path, config: &RemoteConfig) -> Result<String, String> {
-    let raw_data =
-        fs::read(file_path).map_err(|e| format!("Failed to read backup file: {}", e))?;
+    let raw_data = fs::read(file_path).map_err(|e| format!("Failed to read backup file: {}", e))?;
 
     let original_name = file_path
         .file_name()
@@ -29,7 +28,7 @@ pub async fn send_backup(file_path: &Path, config: &RemoteConfig) -> Result<Stri
 
         let ratio = 100 - (compressed.len() * 100 / raw_data.len().max(1));
         println!(
-            "   Compressed: {} → {} bytes ({}% reduction)",
+            "Compressed: {} → {} bytes ({}% reduction)",
             raw_data.len(),
             compressed.len(),
             ratio
@@ -80,7 +79,7 @@ pub async fn send_backup(file_path: &Path, config: &RemoteConfig) -> Result<Stri
             }
         }
 
-        eprintln!("   ⚠️  Attempt {}/3 failed: {}", attempt, last_error);
+        eprintln!("Attempt {}/3 failed: {}", attempt, last_error);
 
         if attempt < 3 {
             tokio::time::sleep(std::time::Duration::from_secs(5 * attempt)).await;

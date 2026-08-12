@@ -32,19 +32,18 @@ pub struct ServerConfig {
     pub api_key: String,
     #[serde(default = "default_max_upload_mb")]
     pub max_upload_size_mb: u64,
-    pub max_remote_backups: Option<u32>, 
+    pub max_remote_backups: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct RetentionConfig {
     #[serde(default = "default_max_local")]
-    pub max_local_backups: u32, 
+    pub max_local_backups: u32,
 }
 
 fn default_max_local() -> u32 {
     7
 }
- 
 
 fn default_port() -> u16 {
     8443

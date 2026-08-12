@@ -55,29 +55,29 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$CONFIG_FILE" ]; then
-    echo "❌ Error: config file is required (-c <file>)"
+    echo "Error: config file is required (-c <file>)"
     usage
 fi
 
 if [ ! -f "$CONFIG_FILE" ]; then
-    echo "❌ Error: config file not found: $CONFIG_FILE"
+    echo "Error: config file not found: $CONFIG_FILE"
     exit 1
 fi
 
 check_requirements() {
     if ! command -v "$PURRGRES_BIN" >/dev/null 2>&1 && [ ! -x "$PURRGRES_BIN" ]; then
-        echo "❌ Error: purrgres binary not found or not executable: $PURRGRES_BIN"
+        echo "Error: purrgres binary not found or not executable: $PURRGRES_BIN"
         echo "   Set --bin <path> or the PURRGRES_BIN environment variable."
         exit 1
     fi
 
     if ! command -v docker >/dev/null 2>&1; then
-        echo "❌ Error: docker command not found."
+        echo "Error: docker command not found."
         exit 1
     fi
 
     if ! docker ps --format '{{.Names}}' | grep -qx "$CONTAINER"; then
-        echo "❌ Error: container '$CONTAINER' is not running."
+        echo "Error: container '$CONTAINER' is not running."
         echo "   Set --container <name> or the PURRGRES_CONTAINER environment variable."
         exit 1
     fi
@@ -93,11 +93,11 @@ start_instance() {
     mkdir -p "$state_dir"
 
     if [ -f "$pid_file" ] && kill -0 "$(cat "$pid_file")" 2>/dev/null; then
-        echo "⚠️  Instance for [$db_name] already running (PID $(cat "$pid_file")). Skipping."
+        echo "Instance for [$db_name] already running (PID $(cat "$pid_file")). Skipping."
         return
     fi
 
-    echo "▶ Starting backup monitor for database [$db_name] (user: $db_user)..."
+    echo "Starting backup monitor for database [$db_name] (user: $db_user)..."
     env HOME="$instance_home" nohup "$PURRGRES_BIN" \
         --container "$CONTAINER" \
         --user "$db_user" \
@@ -118,7 +118,7 @@ main() {
         case "$line" in
             *:*) ;;
             *)
-                echo "⚠️  Skipping malformed line (expected 'database:user'): $line"
+                echo "Skipping malformed line (expected 'database:user'): $line"
                 continue
                 ;;
         esac
@@ -127,7 +127,7 @@ main() {
         db_user="${line##*:}"
 
         if [ -z "$db_name" ] || [ -z "$db_user" ]; then
-            echo "⚠️  Skipping malformed line (expected 'database:user'): $line"
+            echo "Skipping malformed line (expected 'database:user'): $line"
             continue
         fi
 
