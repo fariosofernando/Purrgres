@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Multipart, State},
+    extract::{DefaultBodyLimit, Multipart, State},
     http::{HeaderMap, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Response},
@@ -17,13 +17,9 @@ use tower_http::limit::RequestBodyLimitLayer;
 use super::config::ServerConfig;
 use super::process::cleanup_old_backups;
 
-// ── State ──
-
 pub struct AppState {
     pub config: ServerConfig,
 }
-
-// ── Response types ──
 
 #[derive(Serialize)]
 struct HealthResponse {
@@ -53,8 +49,6 @@ struct ErrorResponse {
     error: String,
 }
 
-// ── Helpers ──
-
 fn error_response(status: StatusCode, msg: &str) -> (StatusCode, Json<ErrorResponse>) {
     (
         status,
@@ -63,8 +57,6 @@ fn error_response(status: StatusCode, msg: &str) -> (StatusCode, Json<ErrorRespo
         }),
     )
 }
-
-// ── Server bootstrap ──
 
 pub async fn start(config: ServerConfig, port_override: Option<u16>) -> Result<(), String> {
     let port = port_override.unwrap_or(config.port);
@@ -78,8 +70,6 @@ pub async fn start(config: ServerConfig, port_override: Option<u16>) -> Result<(
 
     let state = Arc::new(AppState { config });
 
-    // Routes ABOVE the auth layer require API key.
-    // Routes BELOW it (health) are public.
     let app = Router::new()
         .route("/api/upload", post(upload))
         .route("/api/backups", get(list_backups))
@@ -88,6 +78,7 @@ pub async fn start(config: ServerConfig, port_override: Option<u16>) -> Result<(
             auth_middleware,
         ))
         .route("/api/health", get(health))
+        .layer(DefaultBodyLimit::max(max_body))
         .layer(RequestBodyLimitLayer::new(max_body))
         .with_state(state);
 
@@ -107,8 +98,6 @@ pub async fn start(config: ServerConfig, port_override: Option<u16>) -> Result<(
     Ok(())
 }
 
-// ── Auth middleware ──
-
 async fn auth_middleware(
     State(state): State<Arc<AppState>>,
     req: axum::extract::Request,
@@ -126,16 +115,12 @@ async fn auth_middleware(
     }
 }
 
-// ── GET /api/health ──
-
 async fn health() -> impl IntoResponse {
     Json(HealthResponse {
         status: "ok".to_string(),
         version: env!("CARGO_PKG_VERSION").to_string(),
     })
 }
-
-// ── POST /api/upload ──
 
 async fn upload(
     State(state): State<Arc<AppState>>,
@@ -168,7 +153,7 @@ async fn upload(
 
     let data = field.bytes().await.map_err(|e| {
         error_response(
-            StatusCode::INTERNAL_SERVER_ERROR,
+            StatusCode::PAYLOAD_TOO_LARGE,
             &format!("Failed to read upload: {}", e),
         )
     })?;
@@ -177,12 +162,10 @@ async fn upload(
         return Err(error_response(StatusCode::BAD_REQUEST, "Empty file"));
     }
 
-    // Compute checksum
     let mut hasher = Sha256::new();
     hasher.update(&data);
     let computed_checksum = hex::encode(hasher.finalize());
 
-    // Verify if client sent a checksum
     let checksum_verified = match &expected_checksum {
         Some(expected) => {
             if expected != &computed_checksum {
@@ -202,7 +185,6 @@ async fn upload(
     let size = data.len() as u64;
     let dest_path = state.config.storage_path.join(&file_name);
 
-    // Avoid overwriting — append a suffix if file already exists
     let dest_path = unique_path(dest_path);
     let final_name = dest_path
         .file_name()
@@ -223,16 +205,7 @@ async fn upload(
 
     let now = Local::now();
     println!(
-        "[{}] ✅ Received: {} ({} bytes, checksum ok: {})",
-        now.format("%d/%m/%Y %H:%M"),
-        final_name,
-        size,
-        checksum_verified
-    );
-
-    let now = Local::now();
-    println!(
-        "[{}] ✅ Received: {} ({} bytes, checksum ok: {})",
+        "[{}] * Received: {} ({} bytes, checksum ok: {})",
         now.format("%d/%m/%Y %H:%M"),
         final_name,
         size,
@@ -248,8 +221,6 @@ async fn upload(
         timestamp: now.format("%d/%m/%Y %H:%M:%S").to_string(),
     }))
 }
-
-// ── GET /api/backups ──
 
 async fn list_backups(
     State(state): State<Arc<AppState>>,
@@ -291,7 +262,6 @@ async fn list_backups(
     Ok(Json(result))
 }
 
-/// Removes path traversal characters to prevent directory escape
 fn sanitize_filename(name: &str) -> String {
     name.replace(['/', '\\'], "")
         .replace("..", "")
@@ -299,7 +269,6 @@ fn sanitize_filename(name: &str) -> String {
         .to_string()
 }
 
-/// If a file already exists, appends _1, _2, etc. before the extension
 fn unique_path(path: std::path::PathBuf) -> std::path::PathBuf {
     if !path.exists() {
         return path;
