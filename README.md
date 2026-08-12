@@ -678,18 +678,18 @@ If you prefer direct control, you can use the standard commands with the `$HOME`
 
 ```bash
 # Check status for analytics
-HOME=/home/user/backups_piminder/analytics \
+HOME=/home/user/backups_db/analytics \
   purrgres --stats
 
 # List backups for auth
-HOME=/home/user/backups_piminder/auth \
+HOME=/home/user/backups_db/auth \
   purrgres --list-purrs
 
 # View logs
-tail -f /home/user/backups_piminder/analytics/.purrs/purrgres.log
+tail -f /home/user/backups_db/analytics/.purrs/purrgres.log
 
 # Restore a backup
-HOME=/home/user/backups_piminder/auth \
+HOME=/home/user/backups_db/auth \
   purrgres --rpurry auth_12_08_2026_22_02_backup.sql \
   -u ivy -d auth -c postgres
 ```

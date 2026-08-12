@@ -305,7 +305,7 @@ Examples:
   purrgres_restore auth auth_12_08_2026_22_02_backup.sql ivy
   purrgres_stop analytics
   purrgres_summary
-  purrgres_is_running piminder
+  purrgres_is_running db
 
 EOF
     exit 0

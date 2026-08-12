@@ -129,8 +129,8 @@ A simplified command-line interface for common Purrgres operations. No need to r
 # Stop all instances
 ./purrgres-quick.sh stop-all
 
-# Check if piminder is running
-./purrgres-quick.sh is-running piminder
+# Check if db is running
+./purrgres-quick.sh is-running db
 
 # Show summary of all instances
 ./purrgres-quick.sh summary
@@ -215,7 +215,7 @@ purrgres_all_dbs
 purrgres_summary
 
 # Check if running
-purrgres_is_running piminder
+purrgres_is_running db
 ```
 
 ### Configuration
@@ -268,8 +268,8 @@ sleep 2
 ```bash
 #!/bin/bash
 export PURRGRES_CONTAINER="database_service-postgres-1"
-export PURRGRES_BIN="/srv/piminder/services/database_service/purrgres"
-export PURRGRES_BKP_DIR="/home/galatea/backups_piminder"
+export PURRGRES_BIN="/srv/db/services/database_service/purrgres"
+export PURRGRES_BKP_DIR="/home/user/backups_db"
 
 ./run-multi.sh -c databases.conf
 ```
