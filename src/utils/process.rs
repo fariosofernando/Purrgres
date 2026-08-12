@@ -82,7 +82,11 @@ pub fn list_backups(tool_path: &Path) {
     for entry in entries {
         if let Ok(entry) = entry {
             let path = entry.path();
-            if path.is_file() && path.extension() == Some(std::ffi::OsStr::new("sql")) {
+            let name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().to_lowercase())
+                .unwrap_or_default();
+            if path.is_file() && (name.ends_with(".sql") || name.ends_with(".sql.gz")) {
                 let metadata = fs::metadata(&path).expect("Error getting file metadata");
                 let created = metadata.created().expect("Error getting creation date");
 
@@ -91,7 +95,6 @@ pub fn list_backups(tool_path: &Path) {
                         duration_since_epoch.as_secs() as i64,
                         duration_since_epoch.subsec_nanos(),
                     )
-
                     .map(|dt| dt.naive_local());
                     if let Some(created_naive) = created_naive {
                         let formatted_time = created_naive.format("%d/%m/%Y %H:%M").to_string();
@@ -102,7 +105,11 @@ pub fn list_backups(tool_path: &Path) {
                                 } else {
                                     false
                                 };
-                                backups.push((file_str.to_string(), formatted_time, is_last_restored));
+                                backups.push((
+                                    file_str.to_string(),
+                                    formatted_time,
+                                    is_last_restored,
+                                ));
                             }
                         }
                     }
@@ -187,7 +194,7 @@ pub fn cleanup_old_backups(dir: &std::path::Path, max_count: u32) {
     // Remove everything beyond max_count
     for (path, _) in backups.iter().skip(max_count as usize) {
         match fs::remove_file(path) {
-            Ok(_) => println!("🗑️  Removed old backup: {}", path.display()),
+            Ok(_) => println!("Removed old backup: {}", path.display()),
             Err(e) => eprintln!("Failed to remove {}: {}", path.display(), e),
         }
     }
