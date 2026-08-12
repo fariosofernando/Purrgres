@@ -42,6 +42,8 @@
   - [Config File Format](#config-file-format)
   - [Running Multiple Instances](#running-multiple-instances)
   - [Environment Variables](#environment-variables)
+  - [Monitoring & Troubleshooting](#monitoring--troubleshooting)
+  - [Helper Functions](#helper-functions-optional)
 - [Running as a Systemd Service](#running-as-a-systemd-service)
 - [CLI Reference](#cli-reference)
 - [Semantic Versioning](#semantic-versioning)
@@ -63,6 +65,8 @@
 - **Retention policies** — Automatically delete old backups (locally and remotely).
 - **Multi-database support** — Orchestrate isolated backup processes for multiple databases via a helper script.
 - **Retry on failure** — Remote sends retry up to 3 times with exponential backoff.
+- **Database prefix in filenames** — Backup names include database identifier for clarity (e.g., `analytics_12_08_2026_22_02_backup.sql`).
+- **Jitter for concurrent uploads** — Spreads remote sync across time to avoid thundering herd.
 
 ---
 
@@ -84,7 +88,7 @@ purrgres --stats
 purrgres --list-purrs
 
 # 6. Restore a backup
-purrgres --rpurry 11_08_2026_03_00_backup.sql -u postgres -d mydb -c my_container
+purrgres --rpurry analytics_12_08_2026_22_02_backup.sql -u postgres -d mydb -c my_container
 ```
 
 ---
@@ -93,11 +97,11 @@ purrgres --rpurry 11_08_2026_03_00_backup.sql -u postgres -d mydb -c my_containe
 
 ### Download Binary
 
-Pre-compiled binaries for Linux are available on the [Releases](https://github.com/hi-im-aurelio/purrgres/releases) page.
+Pre-compiled binaries for Linux are available on the [Releases](https://github.com/fariosofernando/Purrgres/releases) page.
 
 ```bash
 # Download and extract
-tar -xvf purrgres-*.tar.gz
+tar -xzf purrgres-linux-x86_64.tar.gz
 
 # Make it executable
 chmod +x purrgres
@@ -214,7 +218,7 @@ purrgres -u postgres -d mydb -c my_postgres_container
 
 This will:
 1. Run `pg_dump` immediately.
-2. Save the backup to `~/.purrgres/<date>_backup.sql`.
+2. Save the backup to `~/.purrgres/<database>_<date>_backup.sql` (with database prefix).
 3. If `[remote]` is enabled, compress and send it to the remote server.
 4. If `[retention]` is configured, delete old backups beyond the limit.
 5. Repeat every **24 hours**.
@@ -229,9 +233,9 @@ nohup purrgres -u postgres -d mydb -c my_container > /dev/null 2>&1 &
 
 | Method | Command | Terminal Closes → Process... |
 |---|---|---|
-| Foreground | `purrgres -u ... -d ... -c ...` |  Stops |
-| Background | `nohup purrgres ... > /dev/null 2>&1 &` |  Keeps running |
-| Systemd | `systemctl start purrgres@mydb` |  Keeps running + auto-restarts |
+| Foreground | `purrgres -u ... -d ... -c ...` | ❌ Stops |
+| Background | `nohup purrgres ... > /dev/null 2>&1 &` | ✅ Keeps running |
+| Systemd | `systemctl start purrgres@mydb` | ✅ Keeps running + auto-restarts |
 
 ### List Backups
 
@@ -245,9 +249,9 @@ Output:
 ======================================================================
    backups                 |    date              | restore point
 ======================================================================
-11_08_2026_03_00_backup.sql | 11/08/2026 03:00    | last
-10_08_2026_03_00_backup.sql | 10/08/2026 03:00    |
-09_08_2026_03_00_backup.sql | 09/08/2026 03:00    |
+analytics_12_08_2026_22_02_backup.sql | 12/08/2026 22:02    | last
+analytics_11_08_2026_17_05_backup.sql | 11/08/2026 17:05    |
+analytics_10_08_2026_17_05_backup.sql | 10/08/2026 17:05    |
 ======================================================================
 ```
 
@@ -260,7 +264,7 @@ purrgres --rpurry <BACKUP_FILENAME> -u <PG_USER> -d <DB_NAME> -c <CONTAINER>
 Example:
 
 ```bash
-purrgres --rpurry 11_08_2026_03_00_backup.sql -u postgres -d mydb -c my_container
+purrgres --rpurry analytics_12_08_2026_22_02_backup.sql -u postgres -d mydb -c my_container
 ```
 
 This will:
@@ -361,9 +365,9 @@ purrgres --server --config /etc/purrgres/purrgres.toml
 
 | Endpoint | Method | Auth Required | Description |
 |---|---|---|---|
-| `/api/health` | GET |  No | Health check — returns version and status |
-| `/api/upload` | POST |  Yes | Upload a backup file (multipart form) |
-| `/api/backups` | GET |  Yes | List all received backups |
+| `/api/health` | GET | ❌ No | Health check — returns version and status |
+| `/api/upload` | POST | ✅ Yes | Upload a backup file (multipart form) |
+| `/api/backups` | GET | ✅ Yes | List all received backups |
 
 **Authentication:** Send the API key in the `X-API-Key` header.
 
@@ -476,9 +480,9 @@ Day 1: backup_01.sql  ← deleted on Day 4
 Day 2: backup_02.sql  ← deleted on Day 5
 Day 3: backup_03.sql  ← deleted on Day 6
 Day 4: backup_04.sql  ← deleted on Day 7
-Day 5: backup_05.sql   kept
-Day 6: backup_06.sql   kept
-Day 7: backup_07.sql   kept
+Day 5: backup_05.sql  ✅ kept
+Day 6: backup_06.sql  ✅ kept
+Day 7: backup_07.sql  ✅ kept
 ```
 
 > **Tip:** If `[retention]` is not defined, no automatic cleanup occurs — all backups are kept indefinitely.
@@ -562,8 +566,9 @@ After running, the backup directory will look like:
 ~/purrgres_backups/
 ├── analytics/
 │   ├── .purrgres/
-│   │   ├── 11_08_2026_03_00_backup.sql
-│   │   └── 12_08_2026_03_00_backup.sql
+│   │   ├── analytics_12_08_2026_22_02_backup.sql
+│   │   ├── analytics_11_08_2026_17_05_backup.sql
+│   │   └── purrgres.toml
 │   └── .purrs/
 │       ├── purrgres.log
 │       └── purrgres.pid
@@ -581,8 +586,124 @@ After running, the backup directory will look like:
 The script is **idempotent** — if an instance is already running for a database, it will skip it:
 
 ```
-Instance for [analytics] already running (PID 12345). Skipping.
+⚠️  Instance for [analytics] already running (PID 12345). Skipping.
 ▶ Starting backup monitor for database [billing] (user: billing_user)...
+```
+
+---
+
+## Monitoring & Troubleshooting
+
+### For Single Database Instances
+
+Use the standard CLI commands:
+
+```bash
+# Check status
+purrgres --stats
+
+# List backups
+purrgres --list-purrs
+
+# View logs
+tail -f ~/.purrs/purrgres.log
+```
+
+### For Multiple Database Instances (run-multi.sh)
+
+Since each instance has its own isolated `$HOME`, we provide helper scripts to simplify management.
+
+#### Quick Commands
+
+The easiest way is to use `purrgres-quick.sh`:
+
+```bash
+# Check status of analytics database
+./scripts/purrgres-quick.sh status analytics
+
+# List backups for auth database
+./scripts/purrgres-quick.sh list auth
+
+# Watch logs in real-time
+./scripts/purrgres-quick.sh logs invoice
+
+# Show complete summary of all instances
+./scripts/purrgres-quick.sh summary
+
+# Restore a backup
+./scripts/purrgres-quick.sh restore auth auth_12_08_2026_22_02_backup.sql ivy
+
+# Stop a specific instance
+./scripts/purrgres-quick.sh stop analytics
+
+# Stop all instances
+./scripts/purrgres-quick.sh stop-all
+```
+
+#### Advanced Functions
+
+For automation or complex scripts, use `purrgres-helpers.sh`:
+
+```bash
+source ./scripts/purrgres-helpers.sh
+
+# List all running instances
+purrgres_list_running
+
+# Get status
+purrgres_status analytics
+
+# List backups
+purrgres_list auth
+
+# View logs
+purrgres_logs invoice
+
+# Show summary
+purrgres_summary
+
+# Restore backup
+purrgres_restore auth auth_12_08_2026_22_02_backup.sql ivy
+
+# Stop instance
+purrgres_stop analytics
+
+# List all databases
+purrgres_all_dbs
+```
+
+#### Manual Commands
+
+If you prefer direct control, you can use the standard commands with the `$HOME` variable:
+
+```bash
+# Check status for analytics
+HOME=/home/user/backups_piminder/analytics \
+  purrgres --stats
+
+# List backups for auth
+HOME=/home/user/backups_piminder/auth \
+  purrgres --list-purrs
+
+# View logs
+tail -f /home/user/backups_piminder/analytics/.purrs/purrgres.log
+
+# Restore a backup
+HOME=/home/user/backups_piminder/auth \
+  purrgres --rpurry auth_12_08_2026_22_02_backup.sql \
+  -u ivy -d auth -c postgres
+```
+
+### Full Documentation
+
+For comprehensive guide on monitoring, troubleshooting, and advanced usage of multi-instance setups, see [`scripts/README.md`](./scripts/README.md).
+
+This includes:
+- Detailed explanation of each script
+- All available commands and options
+- Configuration via environment variables
+- Common troubleshooting scenarios
+- Integration examples
 ```
 
 ---
@@ -679,7 +800,7 @@ purrgres --stats
 purrgres --list-purrs
 
 # Restore
-purrgres --rpurry 11_08_2026_03_00_backup.sql -u postgres -d mydb -c my_container
+purrgres --rpurry analytics_12_08_2026_22_02_backup.sql -u postgres -d mydb -c my_container
 
 # Stop
 purrgres --stop
@@ -689,6 +810,9 @@ purrgres --server
 
 # Server with custom config and port
 purrgres --server --config /etc/purrgres/purrgres.toml --port 9090
+
+# Multi-database backup runner
+./scripts/run-multi.sh -c databases.conf --container my_postgres --bin /usr/local/bin/purrgres --backup-dir /var/backups/purrgres
 ```
 
 ---
